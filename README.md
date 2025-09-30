@@ -1,134 +1,137 @@
-Of course. Here is a complete `README.md` file content for your project. You can copy and paste this directly into your `README.md` file.
 
------
+DDI Detector: A Drug-Drug Interaction Checker
+DDI Detector is a backend system and data pipeline for identifying potential drug-drug interactions (DDIs). It processes raw data from biomedical sources like DrugBank, stores it in a structured PostgreSQL database, and exposes a real-time REST API to check for interactions between a given list of medications.
 
-# DDI Detector (Drug-Drug Interaction Detector)
+Overview
+The project's core is a robust ETL (Extract, Transform, Load) pipeline that efficiently handles multi-gigabyte XML data files. The processed data is served via a high-performance FastAPI application, designed for quick and responsive interaction checks. This serves as a proof-of-concept for a clinical decision support tool.
 
-DDI Detector is a proof-of-concept application designed to identify and report potential interactions between a list of drugs. It uses a comprehensive database built from publicly available biomedical data sources and exposes a simple REST API for checking interactions.
+Features
+High-Performance Data Ingestion: Optimized Python scripts using iterative parsing and batch inserts to process large datasets in hours, not days.
 
-## Features
+Containerized Database: A PostgreSQL database running in a Docker container for a consistent and portable development environment.
 
-  * **Comprehensive Database:** Ingests and processes data from sources like DrugBank to build a robust PostgreSQL database of drugs and their known interactions.
-  * **Data Ingestion Pipeline:** Includes optimized Python scripts for parsing large XML files and performing bulk data lookups.
-  * **Name Normalization:** Uses the RxNorm API to map various drug names to standardized identifiers.
-  * **REST API:** A simple FastAPI backend with a `/check` endpoint to query for interactions in real-time.
-  * **Containerized Database:** Uses Docker to run a PostgreSQL database for easy setup and consistency.
+Data Standardization: Enriches the dataset with universal drug identifiers from the public RxNorm API.
 
-## Technology Stack
+Real-Time API: A fast and responsive REST API built with FastAPI, capable of handling on-demand interaction checks.
 
-  * **Backend:** Python, FastAPI
-  * **Database:** PostgreSQL
-  * **Data Libraries:** lxml, SQLAlchemy, pandas
-  * **Environment:** Docker, Python `venv`
+Optimized Lookups: Utilizes a pre-computed, in-memory name index that includes millions of drug names and synonyms for near-instant, case-insensitive lookups.
 
------
+Technology Stack
+Backend: Python, FastAPI
 
-## Setup and Installation
+Database: PostgreSQL, SQLAlchemy
 
-### Prerequisites
+Data Processing: lxml, pandas
 
-  * Python 3.10+
-  * Git
-  * Docker Desktop
+Environment: Docker, Python venv
 
-### 1\. Clone the Repository
+API Client: requests
 
-```bash
+Project Structure
+ddidetector/
+├── .venv/                  # Python virtual environment (ignored by Git)
+├── backend/
+│   └── app.py              # FastAPI application and the /check endpoint
+├── data/
+│   ├── raw/                # Raw, untouched data sources (ignored by Git)
+│   │   └── drugbank/
+│   │       └── full database.xml
+│   └── processed/
+│       └── name_to_drugbank.json # The pre-computed name index for the API
+├── db/
+│   └── schema.sql          # SQL script to create the database tables
+├── ingest/
+│   ├── ingest_optimized.py     # Script to ingest drugs into the 'drugs' table
+│   ├── interactions_ingest.py  # Script to ingest interactions into the 'interactions' table
+│   ├── rxnorm_lookup.py        # Script to enrich data with RxNorm IDs
+│   └── build_name_index.py     # Script to create the name_to_drugbank.json index
+├── .gitignore              # Specifies files and folders for Git to ignore
+└── README.md               # Project documentation (this file)
+Setup and Installation
+Prerequisites
+Python 3.10+
+
+Git
+
+Docker Desktop
+
+1. Clone & Set Up Environment
+PowerShell
+
+# Clone the repository
 git clone https://github.com/4EdmunPeyton21/DDI.git
 cd DDI
-```
 
-### 2\. Set Up the Environment
-
-Create and activate a Python virtual environment.
-
-```powershell
-# For PowerShell
+# Create and activate a Python virtual environment
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-```
 
-Install the required dependencies.
+# Install required dependencies
+pip install fastapi uvicorn sqlalchemy psycopg2-binary pydantic lxml requests
+2. Prepare Data
+Download the DrugBank XML file (full database.xml) and place it inside the data/raw/drugbank/ directory.
 
-```powershell
-pip install -r requirements.txt
-```
+3. Start & Set Up Database
+Ensure Docker Desktop is running.
 
-*(Note: You will need to create a `requirements.txt` file by running `pip freeze > requirements.txt`)*
+PowerShell
 
-### 3\. Prepare Data
-
-Download the necessary raw data files (e.g., the DrugBank XML) and place them in the appropriate subdirectories within `data/raw/`.
-
-### 4\. Start the Database
-
-Ensure Docker Desktop is running, then start the PostgreSQL container.
-
-```bash
+# Run the PostgreSQL container
 docker run --name ddidb -e POSTGRES_PASSWORD=devpass -e POSTGRES_USER=dduser -e POSTGRES_DB=ddidb -p 5432:5432 -d postgres:15
-```
 
-Create the database schema.
-
-```powershell
-# For PowerShell
+# Create the database tables from the schema file
 type db\schema.sql | docker exec -i ddidb psql -U dduser -d ddidb
-```
+4. Run Data Ingestion Pipeline
+Run these scripts in order to populate the database. This is a one-time setup process.
 
-### 5\. Run Ingestion Scripts
+PowerShell
 
-Run the scripts in the following order to populate the database.
+# 1. Ingest drugs
+python ingest/ingest_optimized.py "data/raw/drugbank/full database.xml"
 
-```powershell
-# 1. Ingest drugs from DrugBank
-python ingest/ingest_optimized.py "data/raw/drugbank/your_drugbank_file.xml"
+# 2. Ingest interactions
+python ingest/interactions_ingest.py "data/raw/drugbank/full database.xml"
 
-# 2. Ingest interactions from DrugBank
-python ingest/interactions_ingest.py "data/raw/drugbank/your_drugbank_file.xml"
-
-# 3. Normalize names with RxNorm API
+# 3. Get RxNorm IDs
 python ingest/rxnorm_lookup.py
 
 # 4. Build the name index for the API
 python ingest/build_name_index.py
-```
-
------
-
-## Usage
-
-### 1\. Run the API Server
-
+Usage
+1. Run the API Server
 Start the FastAPI server from the project's root directory.
 
-```powershell
+PowerShell
+
 uvicorn backend.app:app --reload --port 8000
-```
+The server will be available at http://127.0.0.1:8000.
 
-The server will be available at `http://127.0.0.1:8000`.
+2. Test the Endpoint
+In a new terminal, send a POST request to the /check endpoint.
 
-### 2\. Test the Endpoint
+Example using PowerShell:
 
-In a new terminal, you can send a POST request to the `/check` endpoint to find interactions.
+PowerShell
 
-**Example using PowerShell:**
-
-```powershell
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/check" -Method Post -ContentType "application/json" -Body '{"drugs":["Warfarin", "Aspirin"]}'
-```
+Expected Response:
 
-**Expected Response:**
+JSON
 
-```json
 {
   "interactions": [
     {
       "pair": [
         "Warfarin",
-        "Acetylsalicylic acid"
+        "Aspirin"
       ],
       "description": "Acetylsalicylic acid may increase the anticoagulant activities of Warfarin."
     }
   ]
 }
-```
+
+
+
+
+
+
