@@ -1,64 +1,39 @@
+Of course. Here is a complete `README.md` file content for your project. You can copy and paste this directly into your `README.md` file.
 
-DDI Detector: A Drug-Drug Interaction Checker
-DDI Detector is a backend system and data pipeline for identifying potential drug-drug interactions (DDIs). It processes raw data from biomedical sources like DrugBank, stores it in a structured PostgreSQL database, and exposes a real-time REST API to check for interactions between a given list of medications.
+-----
 
-Overview
-The project's core is a robust ETL (Extract, Transform, Load) pipeline that efficiently handles multi-gigabyte XML data files. The processed data is served via a high-performance FastAPI application, designed for quick and responsive interaction checks. This serves as a proof-of-concept for a clinical decision support tool.
+# DDI Detector (Drug-Drug Interaction Detector)
 
-Features
-High-Performance Data Ingestion: Optimized Python scripts using iterative parsing and batch inserts to process large datasets in hours, not days.
+DDI Detector is a proof-of-concept application designed to identify and report potential interactions between a list of drugs. It uses a comprehensive database built from publicly available biomedical data sources and exposes a simple REST API for checking interactions.
 
-Containerized Database: A PostgreSQL database running in a Docker container for a consistent and portable development environment.
+## Features
 
-Data Standardization: Enriches the dataset with universal drug identifiers from the public RxNorm API.
+  * **Comprehensive Database:** Ingests and processes data from sources like DrugBank to build a robust PostgreSQL database of drugs and their known interactions.
+  * **Data Ingestion Pipeline:** Includes optimized Python scripts for parsing large XML files and performing bulk data lookups.
+  * **Name Normalization:** Uses the RxNorm API to map various drug names to standardized identifiers.
+  * **REST API:** A simple FastAPI backend with a `/check` endpoint to query for interactions in real-time.
+  * **Containerized Database:** Uses Docker to run a PostgreSQL database for easy setup and consistency.
 
-Real-Time API: A fast and responsive REST API built with FastAPI, capable of handling on-demand interaction checks.
+## Technology Stack
 
-Optimized Lookups: Utilizes a pre-computed, in-memory name index that includes millions of drug names and synonyms for near-instant, case-insensitive lookups.
+  * **Backend:** Python, FastAPI
+  * **Database:** PostgreSQL
+  * **Data Libraries:** lxml, SQLAlchemy, pandas
+  * **Environment:** Docker, Python `venv`
 
-Technology Stack
-Backend: Python, FastAPI
+-----
 
-Database: PostgreSQL, SQLAlchemy
+## Setup and Installation
 
-Data Processing: lxml, pandas
+### Prerequisites
 
-Environment: Docker, Python venv
+  * Python 3.10+
+  * Git
+  * Docker Desktop
 
-API Client: requests
+### 1\. Clone the Repository
 
-Project Structure
-ddidetector/
-├── .venv/                  # Python virtual environment (ignored by Git)
-├── backend/
-│   └── app.py              # FastAPI application and the /check endpoint
-├── data/
-│   ├── raw/                # Raw, untouched data sources (ignored by Git)
-│   │   └── drugbank/
-│   │       └── full database.xml
-│   └── processed/
-│       └── name_to_drugbank.json # The pre-computed name index for the API
-├── db/
-│   └── schema.sql          # SQL script to create the database tables
-├── ingest/
-│   ├── ingest_optimized.py     # Script to ingest drugs into the 'drugs' table
-│   ├── interactions_ingest.py  # Script to ingest interactions into the 'interactions' table
-│   ├── rxnorm_lookup.py        # Script to enrich data with RxNorm IDs
-│   └── build_name_index.py     # Script to create the name_to_drugbank.json index
-├── .gitignore              # Specifies files and folders for Git to ignore
-└── README.md               # Project documentation (this file)
-Setup and Installation
-Prerequisites
-Python 3.10+
-
-Git
-
-Docker Desktop
-
-1. Clone & Set Up Environment
-PowerShell
-
-# Clone the repository
+```bash
 git clone https://github.com/4EdmunPeyton21/DDI.git
 cd DDI
 
