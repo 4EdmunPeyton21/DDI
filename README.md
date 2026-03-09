@@ -45,8 +45,6 @@ For novel drug detection, we convert chemical **SMILES** strings into **Morgan F
 
 ---
 
-## **📂 Project Structure**
-
 DDIDETECTOR/
 ├── api/                           # API related configurations/routes
 ├── backend/
@@ -86,8 +84,6 @@ DDIDETECTOR/
 ├── requirements.txt               # Python dependencies
 ├── setup_cloud_db.py              # Cloud PostgreSQL (Neon) initialization
 └── vercel.json                    # Deployment configuration for Vercel
-```
-
 ---
 
 ## **⚙️ Installation & Setup**
