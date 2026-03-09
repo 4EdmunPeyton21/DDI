@@ -47,14 +47,45 @@ For novel drug detection, we convert chemical **SMILES** strings into **Morgan F
 
 ## **📂 Project Structure**
 
-```bash
-├── data_pipeline/         # ETL scripts for DrugBank XML parsing
-├── ml_models/             # Random Forest training & Morgan Fingerprint logic
-├── api/                   # FastAPI endpoints and business logic
-├── db/                    # PostgreSQL schema and migration scripts
-├── docker-compose.yml     # Container orchestration
-└── requirements.txt       # Project dependencies
-
+DDIDETECTOR/
+├── api/                           # API related configurations/routes
+├── backend/
+│   └── app.py                     # Main FastAPI application entry point
+├── data/                          # Datasets (ignored in version control usually)
+│   ├── external-mappings/         # External ID mappings (e.g., RxNorm)
+│   ├── processed/                 # Cleaned and processed data ready for training
+│   └── raw/                       # Raw DrugBank XML files
+├── db/
+│   └── schema.sql                 # PostgreSQL database schema definitions
+├── docs/                          # Project documentation and assets
+│   └── Screenshot...png           
+├── ingest/                        # ETL and Data Ingestion Pipeline
+│   ├── build_name_index.py        # In-memory index builder for fast lookups
+│   ├── drugbank_ingest.py         # Standard XML parsing script
+│   ├── ingest_optimized.py        # Optimized iterparse script for memory efficiency
+│   ├── rxnorm_lookup.py           # Drug mapping logic
+│   └── update_smiles.py           # SMILES extraction and formatting
+├── models/                        # Serialized ML Models
+│   ├── biot5_finetuned/           # Fine-tuned BioT5 model weights/configs
+│   ├── smiles_MLP_model.joblib    # Trained Multi-Layer Perceptron model
+│   └── smiles_MLP_scaler.joblib   # Data scaler for Morgan Fingerprints
+├── train/                         # Machine Learning Training Scripts
+│   ├── 1_prepare_data.py          # Data splitting and balancing
+│   ├── 2_train_model.py           # MLP Classifier training logic
+│   ├── prepare_structure_dataset.py # SMILES to Morgan Fingerprint logic
+│   ├── preprocess_t5_data.py      # LLM prompt/completion formatting
+│   ├── run_evaluation.py          # Metrics calculation (Accuracy, ROC, ROUGE)
+│   ├── test_model.py              # Inference testing scripts
+│   └── test_smiles_model.py       # Specific SMILES prediction tests
+├── ui/                            # Frontend interface components
+├── .gitignore                     # Git ignore rules
+├── check_index.py                 # Utility to verify DB indexing
+├── debug_smiles.py                # Utility to troubleshoot structural hashes
+├── export_for_colab.py            # Script to package data/models for GPU training
+├── fast_ingest.py                 # High-speed data loading utility
+├── requirements.txt               # Python dependencies
+├── setup_cloud_db.py              # Cloud PostgreSQL (Neon) initialization
+└── vercel.json                    # Deployment configuration for Vercel
 ```
 
 ---
