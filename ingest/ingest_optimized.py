@@ -4,7 +4,7 @@ from lxml import etree
 from sqlalchemy import create_engine, text
 
 # --- Configuration ---
-DB_URL = "postgresql://dduser:devpass@localhost:5432/ddidb"
+DB_URL = "postgresql://neondb_owner:npg_AY5PZWVCQ8jJ@ep-green-snow-ad00zclq-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
 BATCH_SIZE = 1000
 
 def parse_drugbank_optimized(xml_path):

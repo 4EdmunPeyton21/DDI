@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from transformers import T5ForConditionalGeneration, T5Tokenizer
@@ -29,6 +30,15 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # --- Initialize FastAPI app ---
 app = FastAPI()
+
+# --- Add CORS Middleware ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins like ["http://localhost:8080"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- Helper Function for Fingerprinting ---
 def get_fingerprint(smiles_string):
@@ -202,3 +212,94 @@ def check(payload: CheckIn):
 @app.get("/")
 def read_root():
     return {"status": "DDI Detector Hybrid API is running"}
+
+# --- Autocomplete Endpoint ---
+@app.get("/autocomplete")
+def autocomplete(query: str = ""):
+    """
+    Autocomplete endpoint for drug name suggestions.
+    Returns a list of drug names matching the query (case-insensitive).
+    Searches both primary names and synonyms.
+    
+    Query parameters:
+    - query: Search string (minimum 2 characters)
+    
+    Returns:
+    - List of matching drug names (max 20 results)
+    """
+    if not query or len(query.strip()) < 2:
+        return []
+    
+    query = query.strip()
+    query_lower = query.lower()
+    prefix_match = f"{query_lower}%"
+    contains_match = f"%{query_lower}%"
+    
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        with engine.connect() as conn:
+            # Single query that searches both primary names and synonyms
+            # Prioritizes exact matches, then prefix matches, then contains matches
+            sql = text("""
+                WITH drug_names AS (
+                    -- Primary drug names
+                    SELECT DISTINCT name as drug_name, 1 as priority
+                    FROM drugs
+                    WHERE name IS NOT NULL
+                      AND LOWER(name) LIKE :prefix_match
+                    
+                    UNION
+                    
+                    -- Primary drug names (contains match)
+                    SELECT DISTINCT name as drug_name, 2 as priority
+                    FROM drugs
+                    WHERE name IS NOT NULL
+                      AND LOWER(name) LIKE :contains_match
+                      AND LOWER(name) NOT LIKE :prefix_match
+                    
+                    UNION
+                    
+                    -- Synonyms (prefix match)
+                    SELECT DISTINCT syn as drug_name, 1 as priority
+                    FROM drugs,
+                         unnest(synonyms) AS syn
+                    WHERE syn IS NOT NULL
+                      AND LOWER(syn) LIKE :prefix_match
+                      AND syn NOT IN (
+                          SELECT name FROM drugs WHERE name IS NOT NULL
+                      )
+                    
+                    UNION
+                    
+                    -- Synonyms (contains match)
+                    SELECT DISTINCT syn as drug_name, 2 as priority
+                    FROM drugs,
+                         unnest(synonyms) AS syn
+                    WHERE syn IS NOT NULL
+                      AND LOWER(syn) LIKE :contains_match
+                      AND LOWER(syn) NOT LIKE :prefix_match
+                      AND syn NOT IN (
+                          SELECT name FROM drugs WHERE name IS NOT NULL
+                      )
+                )
+                SELECT drug_name
+                FROM drug_names
+                ORDER BY priority ASC, drug_name ASC
+                LIMIT 20
+            """)
+            
+            results = conn.execute(sql, {
+                "prefix_match": prefix_match,
+                "contains_match": contains_match
+            }).fetchall()
+            
+            # Extract drug names from results
+            drug_names = [row[0] for row in results if row[0]]
+            
+            return drug_names
+            
+    except Exception as e:
+        print(f"Autocomplete error: {e}")
+        raise HTTPException(status_code=500, detail=f"Autocomplete search failed: {str(e)}")

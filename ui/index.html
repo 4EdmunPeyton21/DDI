@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DDI Detector - AI-Powered Drug Interaction Checker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://kit.fontawesome.com/a2e0ad6c6d.js" crossorigin="anonymous"></script>
+</head>
+<body class="min-h-screen bg-slate-50">
+  <!-- Top Navigation Bar -->
+  <nav class="bg-white shadow-sm border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">💊</span>
+        <span class="text-xl font-bold text-slate-900">DDI Detector</span>
+      </div>
+      <span class="px-3 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+        Research Prototype v2.0
+      </span>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="max-w-5xl mx-auto px-4 py-12">
+    <!-- Hero Section -->
+    <section class="text-center mb-12">
+      <h1 class="text-4xl sm:text-5xl font-bold text-slate-900 mb-3">Drug Interaction Analysis</h1>
+      <p class="text-lg text-slate-600">Enter two medications to check for potential interactions</p>
+    </section>
+
+    <!-- Search Interface Card -->
+    <div class="bg-white shadow-xl rounded-2xl p-8 mb-8 border border-slate-100">
+      <div class="flex flex-col sm:flex-row gap-4 mb-6">
+        <!-- Drug A Input -->
+        <div class="flex-1 relative">
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Drug A</label>
+          <div class="relative">
+            <input id="drugA" type="text" placeholder="e.g., Warfarin"
+                   class="w-full rounded-xl border-2 border-slate-200 px-4 py-3.5 text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                   autocomplete="off">
+            <div id="dropdownA" class="absolute z-30 mt-1 w-full bg-white border-2 border-slate-200 rounded-xl shadow-xl hidden max-h-72 overflow-auto"></div>
+          </div>
+        </div>
+
+        <!-- Drug B Input -->
+        <div class="flex-1 relative">
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Drug B</label>
+          <div class="relative">
+            <input id="drugB" type="text" placeholder="e.g., Ibuprofen"
+                   class="w-full rounded-xl border-2 border-slate-200 px-4 py-3.5 text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition"
+                   autocomplete="off">
+            <div id="dropdownB" class="absolute z-30 mt-1 w-full bg-white border-2 border-slate-200 rounded-xl shadow-xl hidden max-h-72 overflow-auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analyze Button -->
+      <button id="checkBtn"
+              class="w-full inline-flex items-center justify-center gap-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-lg font-semibold px-8 py-4 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition disabled:opacity-70 disabled:cursor-not-allowed">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span id="btnText">Analyze Interaction</span>
+        <span id="btnSpinner" class="hidden">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+        </span>
+      </button>
+    </div>
+
+    <!-- Results Section -->
+    <section id="results" class="space-y-4"></section>
+  </div>
+
+  <!-- Footer -->
+  <footer class="mt-16 border-t border-slate-200 bg-white py-8">
+    <div class="max-w-5xl mx-auto px-4">
+      <div class="text-center space-y-4">
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p class="text-sm font-semibold text-amber-900 mb-1">
+            <i class="fa-solid fa-triangle-exclamation"></i> Medical Disclaimer
+          </p>
+          <p class="text-xs text-amber-800">
+            For Research Use Only. Not for Clinical Diagnosis. Always consult with a healthcare professional before making medical decisions.
+          </p>
+        </div>
+        <p class="text-xs text-slate-500">
+          Powered by <span class="font-semibold">Oumi</span>, <span class="font-semibold">PyTorch</span>, and <span class="font-semibold">DrugBank</span>
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const API_BASE = 'http://127.0.0.1:8000';
+    const AUTOCOMPLETE_URL = (q) => `${API_BASE}/autocomplete?query=${encodeURIComponent(q)}`;
+    const CHECK_URL = `${API_BASE}/check`;
+
+    const drugA = document.getElementById('drugA');
+    const drugB = document.getElementById('drugB');
+    const dropdownA = document.getElementById('dropdownA');
+    const dropdownB = document.getElementById('dropdownB');
+    const checkBtn = document.getElementById('checkBtn');
+    const btnText = document.getElementById('btnText');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const results = document.getElementById('results');
+
+    // Debounce helper
+    function debounce(fn, delay = 300) {
+      let timer;
+      return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+      };
+    }
+
+    // Fetch autocomplete suggestions
+    async function fetchSuggestions(query) {
+      if (!query || query.length < 3) return [];
+      try {
+        const res = await fetch(AUTOCOMPLETE_URL(query));
+        if (!res.ok) throw new Error('Autocomplete failed');
+        return await res.json();
+      } catch (e) {
+        console.warn('Autocomplete error:', e);
+        return [];
+      }
+    }
+
+    // Render dropdown menu
+    function renderDropdown(container, items, inputEl) {
+      if (!items.length) {
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+      }
+      container.innerHTML = items.map(item => `
+        <div class="px-4 py-3 hover:bg-sky-50 cursor-pointer text-slate-700 border-b border-slate-100 last:border-b-0 transition">
+          <i class="fa-solid fa-pills text-sky-500 mr-2"></i>
+          ${item}
+        </div>
+      `).join('');
+      container.classList.remove('hidden');
+
+      // Add click handlers
+      Array.from(container.children).forEach((child, idx) => {
+        child.addEventListener('click', () => {
+          inputEl.value = items[idx];
+          container.classList.add('hidden');
+        });
+      });
+    }
+
+    // Setup autocomplete handlers
+    const handleType = (inputEl, container) => debounce(async () => {
+      const q = inputEl.value.trim();
+      const suggestions = await fetchSuggestions(q);
+      renderDropdown(container, suggestions, inputEl);
+    }, 300);
+
+    const handlerA = handleType(drugA, dropdownA);
+    const handlerB = handleType(drugB, dropdownB);
+
+    drugA.addEventListener('input', handlerA);
+    drugB.addEventListener('input', handlerB);
+
+    // Close dropdowns on outside click
+    document.addEventListener('click', (e) => {
+      if (!dropdownA.contains(e.target) && e.target !== drugA) dropdownA.classList.add('hidden');
+      if (!dropdownB.contains(e.target) && e.target !== drugB) dropdownB.classList.add('hidden');
+    });
+
+    // Parse description and highlight "Safer Alternatives"
+    function parseDescription(desc = '') {
+      if (!desc) return 'No description provided.';
+      
+      // Check for "Safer Alternatives" section
+      const saferAltRegex = /(?:Safer Alternatives?|Consider replacing|Alternative:?)\s*:?\s*(.+?)(?:\n|$)/i;
+      const match = desc.match(saferAltRegex);
+      
+      if (match) {
+        const before = desc.substring(0, match.index);
+        const alternative = match[1].trim();
+        const after = desc.substring(match.index + match[0].length);
+        
+        return `
+          <div class="text-slate-700 leading-relaxed">${before || ''}</div>
+          <div class="mt-4 p-4 border-2 border-sky-300 bg-sky-50 rounded-lg">
+            <div class="flex items-start gap-2">
+              <i class="fa-solid fa-circle-info text-sky-600 mt-0.5"></i>
+              <div>
+                <div class="font-semibold text-sky-900 mb-1">Safer Alternatives</div>
+                <div class="text-sm text-sky-800">Consider replacing Drug B with <span class="font-semibold">${alternative}</span>.</div>
+                ${after ? `<div class="mt-2 text-sm text-slate-700">${after}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      
+      return `<div class="text-slate-700 leading-relaxed">${desc}</div>`;
+    }
+
+    // Render confidence bar for AI predictions
+    function renderConfidenceBar(prob = 0) {
+      const pct = Math.round(prob * 100);
+      return `
+        <div class="mt-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-semibold text-purple-700">AI Confidence</span>
+            <span class="text-sm font-bold text-purple-600">${pct}%</span>
+          </div>
+          <div class="w-full h-3 bg-purple-100 rounded-full overflow-hidden shadow-inner">
+            <div class="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-500" style="width:${pct}%;"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Determine card type and styling
+    function getCardStyle(item) {
+      const source = (item.source || '').toLowerCase();
+      const isAI = source.includes('ai') || source.includes('prediction');
+      const isDb = source.includes('database') || source.includes('drugbank') || source.includes('curated');
+      const isSafe = item.probability === 0 || source.includes('safe') || (!isAI && !isDb && !item.probability);
+
+      if (isDb) {
+        return {
+          border: 'border-l-4 border-red-500',
+          bg: 'bg-red-50',
+          badge: '<span class="px-3 py-1.5 text-xs font-bold rounded-full bg-red-100 text-red-800 border border-red-200"><i class="fa-solid fa-shield-halved mr-1"></i>Verified Database Hit</span>',
+          title: 'Verified Risk Detected',
+          icon: '<i class="fa-solid fa-triangle-exclamation text-red-500 text-2xl"></i>'
+        };
+      } else if (isAI) {
+        return {
+          border: 'border-l-4 border-purple-500',
+          bg: 'bg-purple-50',
+          badge: '<span class="px-3 py-1.5 text-xs font-bold rounded-full bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-solid fa-robot mr-1"></i>AI Prediction</span>',
+          title: 'AI-Predicted Interaction',
+          icon: '<i class="fa-solid fa-brain text-purple-500 text-2xl"></i>'
+        };
+      } else {
+        return {
+          border: 'border-l-4 border-green-500',
+          bg: 'bg-green-50',
+          badge: '<span class="px-3 py-1.5 text-xs font-bold rounded-full bg-green-100 text-green-800 border border-green-200"><i class="fa-solid fa-check-circle mr-1"></i>Safe</span>',
+          title: 'No Significant Interaction Detected',
+          icon: '<i class="fa-solid fa-circle-check text-green-500 text-2xl"></i>'
+        };
+      }
+    }
+
+    // Generate result card HTML
+    function cardTemplate(item) {
+      const style = getCardStyle(item);
+      const isAI = (item.source || '').toLowerCase().includes('ai') || (item.source || '').toLowerCase().includes('prediction');
+      
+      return `
+        <article class="${style.border} ${style.bg} shadow-lg rounded-xl p-6 mb-4 border border-slate-200">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2">
+                ${style.badge}
+                <span class="text-xs text-slate-500">${item.source || 'Unknown Source'}</span>
+              </div>
+              <h3 class="text-xl font-bold text-slate-900 mb-1">${style.title}</h3>
+              <p class="text-sm font-semibold text-slate-600">
+                <i class="fa-solid fa-pills text-slate-400 mr-1"></i>
+                ${(item.pair || []).join(' + ')}
+              </p>
+            </div>
+            ${style.icon}
+          </div>
+          
+          <div class="mt-4 text-slate-700">
+            ${parseDescription(item.description || 'No description provided.')}
+          </div>
+          
+          ${isAI && item.probability !== undefined ? renderConfidenceBar(item.probability) : ''}
+        </article>
+      `;
+    }
+
+    // Main check function
+    async function runCheck() {
+      const a = drugA.value.trim();
+      const b = drugB.value.trim();
+      
+      if (!a || !b) {
+        alert('Please enter both drugs before analyzing.');
+        return;
+      }
+
+      // Update button state
+      checkBtn.disabled = true;
+      btnText.textContent = 'Analyzing...';
+      btnSpinner.classList.remove('hidden');
+
+      // Show loading state
+      results.innerHTML = `
+        <div class="bg-white shadow-lg rounded-xl p-8 text-center">
+          <div class="inline-flex items-center gap-3 text-slate-600">
+            <i class="fa-solid fa-spinner fa-spin text-2xl text-sky-500"></i>
+            <span class="text-lg font-semibold">Analyzing interactions...</span>
+          </div>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(CHECK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ drugs: [a, b] })
+        });
+
+        if (!res.ok) {
+          throw new Error(`API Error: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        
+        if (!Array.isArray(data) || !data.length) {
+          // Show safe result if no interactions found
+          results.innerHTML = `
+            <article class="border-l-4 border-green-500 bg-green-50 shadow-lg rounded-xl p-6 border border-slate-200">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="px-3 py-1.5 text-xs font-bold rounded-full bg-green-100 text-green-800 border border-green-200">
+                      <i class="fa-solid fa-check-circle mr-1"></i>Safe
+                    </span>
+                  </div>
+                  <h3 class="text-xl font-bold text-slate-900 mb-1">No Significant Interaction Detected</h3>
+                  <p class="text-sm font-semibold text-slate-600">
+                    <i class="fa-solid fa-pills text-slate-400 mr-1"></i>
+                    ${a} + ${b}
+                  </p>
+                </div>
+                <i class="fa-solid fa-circle-check text-green-500 text-2xl"></i>
+              </div>
+              <div class="mt-4 text-slate-700">
+                No known interactions were found between these medications in our database or AI models.
+              </div>
+            </article>
+          `;
+          return;
+        }
+
+        // Render result cards
+        results.innerHTML = data.map(cardTemplate).join('');
+        
+      } catch (err) {
+        results.innerHTML = `
+          <div class="bg-red-50 border-2 border-red-200 rounded-xl p-6">
+            <div class="flex items-start gap-3">
+              <i class="fa-solid fa-circle-exclamation text-red-500 text-xl mt-0.5"></i>
+              <div>
+                <div class="font-bold text-red-900 mb-1">Error</div>
+                <div class="text-red-700 mb-2">${err.message}</div>
+                <div class="text-sm text-red-600">
+                  Please ensure the API server is running at <code class="bg-red-100 px-1 rounded">${API_BASE}</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } finally {
+        // Reset button state
+        checkBtn.disabled = false;
+        btnText.textContent = 'Analyze Interaction';
+        btnSpinner.classList.add('hidden');
+      }
+    }
+
+    // Event listeners
+    checkBtn.addEventListener('click', runCheck);
+    
+    [drugA, drugB].forEach((input) => {
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          runCheck();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

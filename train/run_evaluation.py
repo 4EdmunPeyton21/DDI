@@ -119,17 +119,17 @@ def main():
     except Exception as e:
         print(f"Could not calculate ROUGE scores: {e}")
 
-    # --- Optional: Calculate BLEU Score ---
-    # try:
-    #     print("\nCalculating BLEU score...")
-    #     nltk.download('punkt', quiet=True) # Required for BLEU
-    #     bleu_metric = load("bleu")
-    #     # BLEU expects references to be a list of lists
-    #     bleu_results = bleu_metric.compute(predictions=all_predictions, references=[[ref] for ref in all_references])
-    #     print("\nBLEU Score:")
-    #     print(f"  BLEU: {bleu_results['bleu'] * 100:.2f}")
-    # except Exception as e:
-    #     print(f"\nCould not calculate BLEU score: {e}")
+
+    try:
+         print("\nCalculating BLEU score...")
+         nltk.download('punkt', quiet=True) # Required for BLEU
+         bleu_metric = load("bleu")
+         # BLEU expects references to be a list of lists
+         bleu_results = bleu_metric.compute(predictions=all_predictions, references=[[ref] for ref in all_references])
+         print("\nBLEU Score:")
+         print(f"  BLEU: {bleu_results['bleu'] * 100:.2f}")
+    except Exception as e:
+         print(f"\nCould not calculate BLEU score: {e}")
 
     print("\nEvaluation complete.")
 
